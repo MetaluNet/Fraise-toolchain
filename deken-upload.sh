@@ -109,7 +109,7 @@ cd lib/tinyusb/src/
     cd -
 rm -rf lib/tinyusb/{lib,test,examples}
 
-rm -rf lib/btstack/{port, test,example,doc,3rd-party/lwip}
+rm -rf lib/btstack/{port,test,example,doc,3rd-party/lwip}
 cd ../..
 
 # ----------------- get cmake
@@ -123,7 +123,13 @@ if ! [ -e Fraise-toolchain/cmake ] ; then
         wget $cmake_url
     fi
     $extract $cmake_file
-    mv $cmake_dir Fraise-toolchain/cmake
+    if [ $os == macos ] ; then
+        rm -rf $cmake_dir/CMake.app/Contents/{MacOS,Frameworks,PlugIns,_CodeSignature,Resources,CodeResources,Info.plist}
+        mv $cmake_dir/CMake.app/Contents Fraise-toolchain/cmake
+        rm -rf $cmake_dir
+    else
+        mv $cmake_dir Fraise-toolchain/cmake
+    fi
 fi
 
 # remove unused stuff in cmake
