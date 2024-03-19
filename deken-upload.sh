@@ -45,6 +45,8 @@ if ! $(in_array $arch $arches) ; then
     exit
     fi
 
+# arm gcc: https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads
+
 extract="tar -xzf"
 binpath=$os-$arch
 case $binpath in
