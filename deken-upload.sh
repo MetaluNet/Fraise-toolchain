@@ -49,6 +49,7 @@ if ! $(in_array $arch $arches) ; then
 
 extract="tar -xzf"
 binpath=$os-$arch
+gccver=13.2.1
 case $binpath in
     linux-amd64)
         cmake_url=https://github.com/Kitware/CMake/releases/download/v3.28.3/cmake-3.28.3-linux-x86_64.tar.gz
@@ -64,7 +65,8 @@ case $binpath in
         ;;
     macos-amd64)
         cmake_url=https://github.com/Kitware/CMake/releases/download/v3.28.3/cmake-3.28.3-macos-universal.tar.gz
-        gcc_url=https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-darwin-x86_64-arm-none-eabi.tar.xz
+        gcc_url=https://developer.arm.com/-/media/Files/downloads/gnu-rm/10.3-2021.10/gcc-arm-none-eabi-10.3-2021.10-mac.tar.bz2
+        gccver=10.3.1
         ;;
     macos-arm64)
         cmake_url=https://github.com/Kitware/CMake/releases/download/v3.28.3/cmake-3.28.3-macos-universal.tar.gz
@@ -161,12 +163,12 @@ cd arm-none-eabi/lib
     rm -rf thumb/*
     mv nofp thumb/
     cd -
-cd lib/gcc/arm-none-eabi/13.2.1/
+cd lib/gcc/arm-none-eabi/${gccver}/
     mv thumb/nofp .
     rm -rf thumb/*
     mv nofp thumb/
     cd -
-cd arm-none-eabi/include/c++/13.2.1/arm-none-eabi
+cd arm-none-eabi/include/c++/${gccver}/arm-none-eabi
     mv thumb/{nofp,v6-m} .
     rm -rf thumb/*
     mv nofp v6-m thumb
@@ -175,6 +177,7 @@ rm -rf share/{doc,info,man,gdb,gcc-arm-none-eabi}
 rm -rf bin/{arm-none-eabi-gdb,arm-none-eabi-lto-dump,arm-none-eabi-gfortran}
 cd ../..
 # ----------------- package to deken
+echo $os $arch deken_os[$os] $deken_arch[$arch]
 DEKEN_ARCH=${deken_os[$os]}-${deken_arch[$arch]}-32
 echo deken arch: $DEKEN_ARCH
 deken package --version $VERSION Fraise-toolchain
