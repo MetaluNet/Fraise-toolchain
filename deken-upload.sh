@@ -59,9 +59,11 @@ case $binpath in
         # todo
         ;;
     windows-amd64)
-        cmake_url=https://github.com/Kitware/CMake/releases/download/v3.28.3/cmake-3.28.3-windows-x86_64.zip
-        gcc_url=https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-mingw-w64-i686-arm-none-eabi.zip
-        extract="unzip"
+        #cmake_url=https://github.com/Kitware/CMake/releases/download/v3.28.3/cmake-3.28.3-windows-x86_64.zip
+        #gcc_url=https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-mingw-w64-i686-arm-none-eabi.zip
+        #extract="unzip"
+        pico_setup_url=https://github.com/raspberrypi/pico-setup-windows/releases/download/v1.5.1/pico-setup-windows-x64-standalone.exe
+        gccver=10.3.1
         ;;
     macos-amd64)
         cmake_url=https://github.com/Kitware/CMake/releases/download/v3.28.3/cmake-3.28.3-macos-universal.tar.gz
@@ -78,24 +80,72 @@ case $binpath in
 
 mkdir -p build/Fraise-toolchain/bin
 cd build
+build_path=$(pwd)
 
 # ----------------- copy bins and pic-sdk
 cp ../bin/$binpath/* Fraise-toolchain/bin
 cp -r ../pic-sdk Fraise-toolchain/
 
-# ----------------- clone pico-sdk
-
-if ! [ -e Fraise-toolchain/pico-sdk ] ; then
-    git clone https://github.com/raspberrypi/pico-sdk.git Fraise-toolchain/pico-sdk
-    cd Fraise-toolchain/pico-sdk
-    git submodule init
-    git submodule update
-    cd -
+if [ $os == windows ] ; then
+    pico_setup_file=$(basename $pico_setup_url)
+    pico_windows_path=Fraise-toolchain/pico-windows
+    # pacman -S p7zip
+    if ! [ -e $pico_windows_path ] ; then
+        if ! [ -e $pico_setup_file ] ; then
+            wget $pico_setup_url
+        fi
+        7z x -o$pico_windows_path $pico_setup_file
     fi
+    cmake_path=$pico_windows_path/cmake
+    gcc_path=$pico_windows_path/gcc-arm-none-eabi
+    pico_sdk_path=$pico_windows_path/pico-sdk
+else
+    # ----------------- clone pico-sdk
+    pico_sdk_path=Fraise-toolchain/pico-sdk
+    if ! [ -e $pico_sdk_path ] ; then
+        git clone https://github.com/raspberrypi/pico-sdk.git $pico_sdk_path
+        cd $pico_sdk_path
+        git submodule init
+        git submodule update
+        cd -
+        fi
+    # ----------------- get cmake
+    cmake_path=Fraise-toolchain/cmake
+    cmake_file=$(basename $cmake_url)
+    cmake_dir="${cmake_file%.*}" # remove ".gz"
+    cmake_dir="${cmake_dir%.*}"
+
+    if ! [ -e $cmake_path ] ; then
+        if ! [ -e $cmake_file ] ; then
+            wget $cmake_url
+        fi
+        $extract $cmake_file
+        if [ $os == macos ] ; then
+            rm -rf $cmake_dir/CMake.app/Contents/{MacOS,Frameworks,PlugIns,_CodeSignature,Resources,CodeResources,Info.plist}
+            mv $cmake_dir/CMake.app/Contents $cmake_path
+            rm -rf $cmake_dir
+        else
+            mv $cmake_dir $cmake_path
+        fi
+    fi
+    # ----------------- get gcc
+    gcc_path=Fraise-toolchain/gcc
+    gcc_file=$(basename $gcc_url)
+    gcc_dir="${gcc_file%.*}" # remove ".xz"
+    gcc_dir="${gcc_dir%.*}" # remove ".tar"
+
+    if ! [ -e $gcc_path ] ; then
+        if ! [ -e $gcc_file ] ; then
+            wget $gcc_url
+        fi
+        mkdir -p $gcc_path
+        tar -xJf $gcc_file -C $gcc_path --strip-components=1
+    fi
+fi
 
 # remove unused stuff in sdk-pico
 
-cd Fraise-toolchain/pico-sdk
+cd $pico_sdk_path
 rm -rf .git/ docs/* test/ lib/mbedtls/tests
 touch docs/CMakeLists.txt
 cd lib/tinyusb/hw
@@ -114,50 +164,17 @@ cd lib/tinyusb/src/
 rm -rf lib/tinyusb/{lib,test,examples}
 
 rm -rf lib/btstack/{port,test,example,doc,3rd-party/lwip}
-cd ../..
-
-# ----------------- get cmake
-
-cmake_file=$(basename $cmake_url)
-cmake_dir="${cmake_file%.*}" # remove ".gz" or ".zip"
-if [ os != windows ] ; then cmake_dir="${cmake_dir%.*}" ; fi # remove ".tar"
-
-if ! [ -e Fraise-toolchain/cmake ] ; then
-    if ! [ -e $cmake_file ] ; then
-        wget $cmake_url
-    fi
-    $extract $cmake_file
-    if [ $os == macos ] ; then
-        rm -rf $cmake_dir/CMake.app/Contents/{MacOS,Frameworks,PlugIns,_CodeSignature,Resources,CodeResources,Info.plist}
-        mv $cmake_dir/CMake.app/Contents Fraise-toolchain/cmake
-        rm -rf $cmake_dir
-    else
-        mv $cmake_dir Fraise-toolchain/cmake
-    fi
-fi
+cd $build_path
 
 # remove unused stuff in cmake
 
-rm -rf Fraise-toolchain/cmake/bin/{cmake-gui,ccmake,ctest,cpack}
-rm -rf Fraise-toolchain/cmake/{doc,man}
+rm -rf $cmake_path/bin/{cmake-gui,ccmake,ctest,cpack}
+rm -rf $cmake_path/{doc,man}
 
-# ----------------- get gcc
-
-gcc_file=$(basename $gcc_url)
-gcc_dir="${gcc_file%.*}" # remove ".xz"
-gcc_dir="${gcc_dir%.*}" # remove ".tar"
-
-if ! [ -e Fraise-toolchain/gcc ] ; then
-    if ! [ -e $gcc_file ] ; then
-        wget $gcc_url
-    fi
-    mkdir -p Fraise-toolchain/gcc
-    tar -xJf $gcc_file -C Fraise-toolchain/gcc --strip-components=1
-fi
 
 # remove unused stuff in gcc
 
-cd Fraise-toolchain/gcc
+cd $gcc_path
 cd arm-none-eabi/lib
     mv thumb/nofp .
     rm -rf thumb/*
@@ -175,7 +192,8 @@ cd arm-none-eabi/include/c++/${gccver}/arm-none-eabi
     cd -
 rm -rf share/{doc,info,man,gdb,gcc-arm-none-eabi}
 rm -rf bin/{arm-none-eabi-gdb,arm-none-eabi-lto-dump,arm-none-eabi-gfortran}
-cd ../..
+cd $build_path
+
 # ----------------- package to deken
 echo $os $arch deken_os[$os] $deken_arch[$arch]
 DEKEN_ARCH=${deken_os[$os]}-${deken_arch[$arch]}-32
