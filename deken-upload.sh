@@ -49,15 +49,16 @@ if ! $(in_array $arch $arches) ; then
 
 extract="tar -xzf"
 binpath=$os-$arch
-gccver=13.2.1
 case $binpath in
     linux-amd64)
         cmake_url=https://github.com/Kitware/CMake/releases/download/v3.28.3/cmake-3.28.3-linux-x86_64.tar.gz
+        extract_make="tar -xzf"
         gcc_url=https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-x86_64-arm-none-eabi.tar.xz
+        extract_gcc="tar -xJf"
+        gccver=13.2.1
         ;;
-    linux-arm32)
-        # todo
-        ;;
+    #linux-arm64)
+    #    ;;
     windows-amd64)
         #cmake_url=https://github.com/Kitware/CMake/releases/download/v3.28.3/cmake-3.28.3-windows-x86_64.zip
         #gcc_url=https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-mingw-w64-i686-arm-none-eabi.zip
@@ -69,10 +70,13 @@ case $binpath in
         cmake_url=https://github.com/Kitware/CMake/releases/download/v3.28.3/cmake-3.28.3-macos-universal.tar.gz
         gcc_url=https://developer.arm.com/-/media/Files/downloads/gnu-rm/10.3-2021.10/gcc-arm-none-eabi-10.3-2021.10-mac.tar.bz2
         gccver=10.3.1
+        extract_gcc="tar -xjf"
         ;;
     macos-arm64)
         cmake_url=https://github.com/Kitware/CMake/releases/download/v3.28.3/cmake-3.28.3-macos-universal.tar.gz
         gcc_url=https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-darwin-arm64-arm-none-eabi.tar.xz
+        gccver=13.2.1
+        extract_gcc="tar -xJf"
         ;;
     *) echo "os-arch not supported (yet)"
     return ;;
@@ -99,6 +103,7 @@ if [ $os == windows ] ; then
     cmake_path=$pico_windows_path/cmake
     gcc_path=$pico_windows_path/gcc-arm-none-eabi
     pico_sdk_path=$pico_windows_path/pico-sdk
+    rm -rf $pico_windows_path/{pico-examples.zip,git,openocd}
 else
     # ----------------- clone pico-sdk
     pico_sdk_path=Fraise-toolchain/pico-sdk
@@ -139,7 +144,7 @@ else
             wget $gcc_url
         fi
         mkdir -p $gcc_path
-        tar -xJf $gcc_file -C $gcc_path --strip-components=1
+        $extract_gcc $gcc_file -C $gcc_path --strip-components=1
     fi
 fi
 
@@ -168,7 +173,7 @@ cd $build_path
 
 # remove unused stuff in cmake
 
-rm -rf $cmake_path/bin/{cmake-gui,ccmake,ctest,cpack}
+rm -rf $cmake_path/bin/{cmake-gui,ccmake,ctest,cpack}*
 rm -rf $cmake_path/{doc,man}
 
 
@@ -176,14 +181,14 @@ rm -rf $cmake_path/{doc,man}
 
 cd $gcc_path
 cd arm-none-eabi/lib
-    mv thumb/nofp .
+    mv thumb/{nofp,v6-m} .
     rm -rf thumb/*
-    mv nofp thumb/
+    mv nofp v6-m thumb/
     cd -
 cd lib/gcc/arm-none-eabi/${gccver}/
-    mv thumb/nofp .
+    mv thumb/{nofp,v6-m} .
     rm -rf thumb/*
-    mv nofp thumb/
+    mv nofp v6-m thumb/
     cd -
 cd arm-none-eabi/include/c++/${gccver}/arm-none-eabi
     mv thumb/{nofp,v6-m} .
@@ -191,7 +196,8 @@ cd arm-none-eabi/include/c++/${gccver}/arm-none-eabi
     mv nofp v6-m thumb
     cd -
 rm -rf share/{doc,info,man,gdb,gcc-arm-none-eabi}
-rm -rf bin/{arm-none-eabi-gdb,arm-none-eabi-lto-dump,arm-none-eabi-gfortran}
+rm -rf bin/{arm-none-eabi-gdb,arm-none-eabi-lto-dump,arm-none-eabi-gfortran}*
+
 cd $build_path
 
 # ----------------- package to deken
