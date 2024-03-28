@@ -1,6 +1,5 @@
 # Fraise-toolchain
-Pre-compiled binaries for compiling Fraise firmwares
-
+Pre-compiled binaries for compiling [Fraise](https://github.com/MetaluNet/Fraise) firmwares
 
 All files in bin/ are tracked with git-lfs.
 
