@@ -3,7 +3,7 @@
 # to be called from the pub/ directory (here)
 usage="usage: toolchain-upload.sh OS(linux/windows/macos) ARCH(i386/amd64/arm32/arm64) [test]"
 
-VERSION="0.1.0" # `git describe --abbrev=0`
+VERSION=`git describe --abbrev=0`
 
 oses="linux macos windows"
 arches="i386 amd64 arm32 arm64"
