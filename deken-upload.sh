@@ -82,40 +82,35 @@ case $binpath in
     return ;;
     esac
 
-mkdir -p build/Fraise-toolchain/bin
+toolchain_path=Fraise-toolchain-$binpath
+
+mkdir -p build/$toolchain_path/bin
 cd build
 build_path=$(pwd)
 
 # ----------------- copy bins and pic-sdk
-cp ../bin/$binpath/* Fraise-toolchain/bin
-cp -r ../pic-sdk Fraise-toolchain/
+cp ../bin/$binpath/* $toolchain_path/bin
+cp -r ../pic-sdk $toolchain_path/
 
 if [ $os == windows ] ; then
     pico_setup_file=$(basename $pico_setup_url)
-    pico_windows_path=Fraise-toolchain/pico-windows
+    pico_windows_path=$toolchain_path/pico-windows
+    pico_sdk_path=$pico_windows_path/pico-sdk
     # pacman -S p7zip
     if ! [ -e $pico_windows_path ] ; then
         if ! [ -e $pico_setup_file ] ; then
             wget $pico_setup_url
         fi
         7z x -o$pico_windows_path $pico_setup_file
+        rm -rf $pico_sdk_path # remove old pico sdk
     fi
     cmake_path=$pico_windows_path/cmake
     gcc_path=$pico_windows_path/gcc-arm-none-eabi
-    pico_sdk_path=$pico_windows_path/pico-sdk
     rm -rf $pico_windows_path/{pico-examples.zip,git,openocd}
 else
-    # ----------------- clone pico-sdk
-    pico_sdk_path=Fraise-toolchain/pico-sdk
-    if ! [ -e $pico_sdk_path ] ; then
-        git clone https://github.com/raspberrypi/pico-sdk.git $pico_sdk_path
-        cd $pico_sdk_path
-        git submodule init
-        git submodule update
-        cd -
-        fi
+    pico_sdk_path=$toolchain_path/pico-sdk
     # ----------------- get cmake
-    cmake_path=Fraise-toolchain/cmake
+    cmake_path=$toolchain_path/cmake
     cmake_file=$(basename $cmake_url)
     cmake_dir="${cmake_file%.*}" # remove ".gz"
     cmake_dir="${cmake_dir%.*}"
@@ -134,7 +129,7 @@ else
         fi
     fi
     # ----------------- get gcc
-    gcc_path=Fraise-toolchain/gcc
+    gcc_path=$toolchain_path/gcc
     gcc_file=$(basename $gcc_url)
     gcc_dir="${gcc_file%.*}" # remove ".xz"
     gcc_dir="${gcc_dir%.*}" # remove ".tar"
@@ -148,17 +143,26 @@ else
     fi
 fi
 
+# clone pico-sdk
+if ! [ -e $pico_sdk_path ] ; then
+    git clone https://github.com/raspberrypi/pico-sdk.git $pico_sdk_path
+    cd $pico_sdk_path
+    git submodule init
+    git submodule update
+    cd -
+    fi
+
 # remove unused stuff in sdk-pico
 
 cd $pico_sdk_path
 rm -rf .git/ docs/* test/ lib/mbedtls/tests
 touch docs/CMakeLists.txt
 cd lib/tinyusb/hw
-    mv mcu/raspberry_pi .
+    #mv mcu/raspberry_pi .
     mv bsp/rp2040 bsp/family_support.cmake .
     rm -rf mcu/*
     rm -rf bsp/*
-    mv raspberry_pi mcu/
+    #mv raspberry_pi mcu/
     mv rp2040 family_support.cmake bsp/
     cd -
 cd lib/tinyusb/src/
@@ -178,22 +182,23 @@ rm -rf $cmake_path/{doc,man}
 
 
 # remove unused stuff in gcc
-
+thumbs=(nofp v6-m v8-m.main+fp)
 cd $gcc_path
+IFS=,
 cd arm-none-eabi/lib
-    mv thumb/{nofp,v6-m} .
+    eval mv "thumb/{${thumbs[*]}}" .
     rm -rf thumb/*
-    mv nofp v6-m thumb/
+    mv ${thumbs[*]} thumb/
     cd -
 cd lib/gcc/arm-none-eabi/${gccver}/
-    mv thumb/{nofp,v6-m} .
+    eval mv "thumb/{${thumbs[*]}}" .
     rm -rf thumb/*
-    mv nofp v6-m thumb/
+    mv ${thumbs[*]} thumb/
     cd -
 cd arm-none-eabi/include/c++/${gccver}/arm-none-eabi
-    mv thumb/{nofp,v6-m} .
+    eval mv "thumb/{${thumbs[*]}}" .
     rm -rf thumb/*
-    mv nofp v6-m thumb
+    mv ${thumbs[*]} thumb
     cd -
 rm -rf share/{doc,info,man,gdb,gcc-arm-none-eabi}
 rm -rf bin/{arm-none-eabi-gdb,arm-none-eabi-lto-dump,arm-none-eabi-gfortran}*
@@ -204,6 +209,8 @@ cd $build_path
 echo $os $arch deken_os[$os] $deken_arch[$arch]
 DEKEN_ARCH=${deken_os[$os]}-${deken_arch[$arch]}-32
 echo deken arch: $DEKEN_ARCH
+rm -f Fraise-toolchain
+ln -s $toolchain_path Fraise-toolchain
 deken package --version $VERSION Fraise-toolchain
 
 mv "Fraise-toolchain[v$VERSION](Sources).dek"        "Fraise-toolchain[v$VERSION]($DEKEN_ARCH).dek"
